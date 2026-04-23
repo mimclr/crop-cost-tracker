@@ -20,6 +20,7 @@ import { Plus, Download, MoreVertical, LogOut, UserCog, FileSpreadsheet, FileTex
 import { ListaLancamentos } from "@/components/ListaLancamentos";
 import { Relatorios } from "@/components/Relatorios";
 import { NovoLancamentoSheet } from "@/components/NovoLancamentoSheet";
+import { GerenciarLancamentos } from "@/components/GerenciarLancamentos";
 import { CadastroForm } from "@/components/CadastroForm";
 import { toast } from "sonner";
 
@@ -34,6 +35,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [editingLancamento, setEditingLancamento] = useState<Lancamento | null>(null);
   const [editing, setEditing] = useState(false);
 
   const reload = async () => {
@@ -120,12 +122,27 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
       </header>
 
       <main className="px-4 pt-4">
-        <Tabs defaultValue="lancamentos">
-          <TabsList className="grid grid-cols-2 w-full">
-            <TabsTrigger value="lancamentos">Lançamentos</TabsTrigger>
+        <Tabs defaultValue="gerenciar">
+          <TabsList className="grid grid-cols-3 w-full">
+            <TabsTrigger value="gerenciar">Gerenciar</TabsTrigger>
+            <TabsTrigger value="resumo">Resumo</TabsTrigger>
             <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
           </TabsList>
-          <TabsContent value="lancamentos" className="mt-4">
+          <TabsContent value="gerenciar" className="mt-4">
+            {loading ? (
+              <p className="text-center text-muted-foreground py-8">Carregando...</p>
+            ) : (
+              <GerenciarLancamentos
+                lancamentos={lancamentos}
+                onChange={reload}
+                onEdit={(l) => {
+                  setEditingLancamento(l);
+                  setSheetOpen(true);
+                }}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="resumo" className="mt-4">
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Carregando...</p>
             ) : (
@@ -150,7 +167,10 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
 
       <Button
         size="lg"
-        onClick={() => setSheetOpen(true)}
+        onClick={() => {
+          setEditingLancamento(null);
+          setSheetOpen(true);
+        }}
         className="fixed bottom-5 right-5 left-5 sm:left-auto sm:right-6 sm:bottom-6 h-14 rounded-full shadow-[var(--shadow-elevated)] text-base font-semibold"
         style={{ background: "var(--gradient-primary)" }}
       >
@@ -159,8 +179,12 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
 
       <NovoLancamentoSheet
         open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        onOpenChange={(o) => {
+          setSheetOpen(o);
+          if (!o) setEditingLancamento(null);
+        }}
         elementosUsados={elementosUsados}
+        editing={editingLancamento}
         onSaved={reload}
       />
     </div>
