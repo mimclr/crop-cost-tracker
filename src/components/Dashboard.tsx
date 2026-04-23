@@ -1,0 +1,168 @@
+import { useEffect, useState } from "react";
+import { clearSession } from "@/lib/auth";
+import {
+  getProdutor,
+  listLancamentos,
+  type Lancamento,
+  type Produtor,
+} from "@/lib/db";
+import { exportPDF, exportXLSX } from "@/lib/exporters";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Download, MoreVertical, LogOut, UserCog, FileSpreadsheet, FileText } from "lucide-react";
+import { ListaLancamentos } from "@/components/ListaLancamentos";
+import { Relatorios } from "@/components/Relatorios";
+import { NovoLancamentoSheet } from "@/components/NovoLancamentoSheet";
+import { CadastroForm } from "@/components/CadastroForm";
+import { toast } from "sonner";
+
+interface Props {
+  email: string;
+  produtor: Produtor;
+  onProdutorChange: (p: Produtor) => void;
+  onLogout: () => void;
+}
+
+export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props) {
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  const reload = async () => {
+    const data = await listLancamentos();
+    setLancamentos(data);
+  };
+
+  useEffect(() => {
+    reload().finally(() => setLoading(false));
+  }, []);
+
+  const handleLogout = () => {
+    clearSession();
+    onLogout();
+  };
+
+  const elementosUsados = Array.from(new Set(lancamentos.map((l) => l.elemento_despesa)));
+
+  if (editing) {
+    return (
+      <CadastroForm
+        email={email}
+        initial={produtor}
+        title="Editar cadastro"
+        onCancel={() => setEditing(false)}
+        onSaved={async () => {
+          const p = await getProdutor();
+          if (p) onProdutorChange(p);
+          setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen pb-28" style={{ background: "var(--gradient-soft)" }}>
+      <header
+        className="sticky top-0 z-10 px-4 py-3 shadow-[var(--shadow-soft)]"
+        style={{ background: "var(--gradient-primary)" }}
+      >
+        <div className="flex justify-between items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-primary-foreground/80 truncate">{produtor.nomePropriedade}</p>
+            <h1 className="text-base font-bold text-primary-foreground truncate">
+              {produtor.nomeCompleto}
+            </h1>
+            <span className="inline-block mt-1 text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full bg-primary-foreground/20 text-primary-foreground">
+              {produtor.cultura}
+            </span>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditing(true)}>
+                <UserCog className="h-4 w-4 mr-2" /> Editar cadastro
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (lancamentos.length === 0) return toast.error("Sem dados para exportar");
+                  exportXLSX(lancamentos, produtor);
+                }}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar XLSX
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  if (lancamentos.length === 0) return toast.error("Sem dados para exportar");
+                  exportPDF(lancamentos, produtor);
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" /> Exportar PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                <LogOut className="h-4 w-4 mr-2" /> Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
+
+      <main className="px-4 pt-4">
+        <Tabs defaultValue="lancamentos">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="lancamentos">Lançamentos</TabsTrigger>
+            <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+          </TabsList>
+          <TabsContent value="lancamentos" className="mt-4">
+            {loading ? (
+              <p className="text-center text-muted-foreground py-8">Carregando...</p>
+            ) : (
+              <ListaLancamentos lancamentos={lancamentos} onChange={reload} />
+            )}
+          </TabsContent>
+          <TabsContent value="relatorios" className="mt-4">
+            <Relatorios lancamentos={lancamentos} />
+            {lancamentos.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <Button variant="outline" onClick={() => exportXLSX(lancamentos, produtor)}>
+                  <Download className="h-4 w-4" /> XLSX
+                </Button>
+                <Button variant="outline" onClick={() => exportPDF(lancamentos, produtor)}>
+                  <Download className="h-4 w-4" /> PDF
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      <Button
+        size="lg"
+        onClick={() => setSheetOpen(true)}
+        className="fixed bottom-5 right-5 left-5 sm:left-auto sm:right-6 sm:bottom-6 h-14 rounded-full shadow-[var(--shadow-elevated)] text-base font-semibold"
+        style={{ background: "var(--gradient-primary)" }}
+      >
+        <Plus className="h-5 w-5" /> Novo Lançamento
+      </Button>
+
+      <NovoLancamentoSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        elementosUsados={elementosUsados}
+        onSaved={reload}
+      />
+    </div>
+  );
+}

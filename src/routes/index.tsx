@@ -1,26 +1,88 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { getSessionEmail } from "@/lib/auth";
+import { getProdutor, type Produtor } from "@/lib/db";
+import { LoginScreen } from "@/components/LoginScreen";
+import { CadastroForm } from "@/components/CadastroForm";
+import { Dashboard } from "@/components/Dashboard";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/")({
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
+type Stage = "loading" | "login" | "cadastro" | "dashboard";
 
 function Index() {
-  return <PlaceholderIndex />;
+  const [stage, setStage] = useState<Stage>("loading");
+  const [email, setEmail] = useState<string>("");
+  const [produtor, setProdutor] = useState<Produtor | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const sess = getSessionEmail();
+      if (!sess) {
+        setStage("login");
+        return;
+      }
+      setEmail(sess);
+      const p = await getProdutor();
+      if (p) {
+        setProdutor(p);
+        setStage("dashboard");
+      } else {
+        setStage("cadastro");
+      }
+    })();
+  }, []);
+
+  const handleAuth = async (e: string) => {
+    setEmail(e);
+    const p = await getProdutor();
+    if (p) {
+      setProdutor(p);
+      setStage("dashboard");
+    } else {
+      setStage("cadastro");
+    }
+  };
+
+  return (
+    <>
+      {stage === "loading" && (
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{ background: "var(--gradient-soft)" }}
+        >
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      )}
+      {stage === "login" && <LoginScreen onAuthenticated={handleAuth} />}
+      {stage === "cadastro" && (
+        <CadastroForm
+          email={email}
+          onSaved={async () => {
+            const p = await getProdutor();
+            if (p) {
+              setProdutor(p);
+              setStage("dashboard");
+            }
+          }}
+        />
+      )}
+      {stage === "dashboard" && produtor && (
+        <Dashboard
+          email={email}
+          produtor={produtor}
+          onProdutorChange={setProdutor}
+          onLogout={() => {
+            setProdutor(null);
+            setEmail("");
+            setStage("login");
+          }}
+        />
+      )}
+      <Toaster position="top-center" />
+    </>
+  );
 }
