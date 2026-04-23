@@ -3,6 +3,7 @@ import {
   ATIVIDADES,
   ELEMENTOS_SUGERIDOS,
   addLancamento,
+  updateLancamento,
   type Lancamento,
 } from "@/lib/db";
 import { todayISO } from "@/lib/format";
@@ -19,9 +20,12 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSaved: (l: Lancamento) => void;
   elementosUsados: string[];
+  /** Quando definido, abre em modo edição */
+  editing?: Lancamento | null;
 }
 
-export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsados }: Props) {
+export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsados, editing }: Props) {
+  const isEdit = !!editing;
   const [data, setData] = useState(todayISO());
   const [atividade, setAtividade] = useState<string>(ATIVIDADES[0]);
   const [elemento, setElemento] = useState("");
@@ -31,7 +35,15 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (editing) {
+      setData(editing.data);
+      setAtividade(editing.atividade);
+      setElemento(editing.elemento_despesa);
+      setQuantidade(String(editing.quantidade));
+      setValorTotal(String(editing.valor_total));
+      setObservacao(editing.observacao);
+    } else {
       setData(todayISO());
       setAtividade(ATIVIDADES[0]);
       setElemento("");
@@ -39,7 +51,7 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
       setValorTotal("");
       setObservacao("");
     }
-  }, [open]);
+  }, [open, editing]);
 
   const qtd = parseFloat(quantidade.replace(",", "."));
   const vt = parseFloat(valorTotal.replace(",", "."));
@@ -63,16 +75,19 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
     }
     setSaving(true);
     try {
-      const novo = await addLancamento({
+      const payload = {
         data,
         atividade,
         elemento_despesa: elemento.trim(),
         quantidade: qtd,
         valor_total: vt,
         observacao: observacao.trim(),
-      });
-      toast.success("Lançamento salvo");
-      onSaved(novo);
+      };
+      const result = isEdit
+        ? await updateLancamento(editing!.id, payload)
+        : await addLancamento(payload);
+      toast.success(isEdit ? "Lançamento atualizado" : "Lançamento salvo");
+      onSaved(result);
       onOpenChange(false);
     } catch {
       toast.error("Erro ao salvar");
@@ -85,8 +100,10 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[92vh] overflow-y-auto rounded-t-2xl">
         <SheetHeader className="text-left">
-          <SheetTitle>Novo Lançamento</SheetTitle>
-          <SheetDescription>Preencha os dados do gasto operacional</SheetDescription>
+          <SheetTitle>{isEdit ? "Editar Lançamento" : "Novo Lançamento"}</SheetTitle>
+          <SheetDescription>
+            {isEdit ? "Altere os dados e salve" : "Preencha os dados do gasto operacional"}
+          </SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
@@ -188,7 +205,7 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
               Cancelar
             </Button>
             <Button type="submit" className="flex-1" disabled={saving}>
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : isEdit ? "Atualizar" : "Salvar"}
             </Button>
           </div>
         </form>

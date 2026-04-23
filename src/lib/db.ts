@@ -113,6 +113,22 @@ export async function addLancamento(l: Omit<Lancamento, "id" | "valor_unitario" 
   return novo;
 }
 
+export async function updateLancamento(
+  id: string,
+  patch: Omit<Lancamento, "id" | "valor_unitario" | "criadoEm">,
+): Promise<Lancamento> {
+  const db = await getDB();
+  const existing = await db.get("lancamentos", id);
+  if (!existing) throw new Error("Lançamento não encontrado");
+  const atualizado: Lancamento = {
+    ...existing,
+    ...patch,
+    valor_unitario: patch.quantidade > 0 ? patch.valor_total / patch.quantidade : 0,
+  };
+  await db.put("lancamentos", atualizado);
+  return atualizado;
+}
+
 export async function deleteLancamento(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("lancamentos", id);
