@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Lancamento, Produtor } from "./db";
@@ -48,61 +47,104 @@ export function resumoAtividade(l: Lancamento[]) {
   return agrupar(l, (x) => x.atividade);
 }
 
-export async function exportXLSX(lancamentos: Lancamento[], produtor: Produtor | undefined) {
-  const wb = XLSX.utils.book_new();
-  wb.Props = {
-    Title: "Gestão de Custos - Labor Rural",
-    Subject: "Custos operacionais agrícolas",
-    Author: "Labor Rural",
-    Company: "Labor Rural",
-    CreatedDate: new Date(),
-  };
+function csvEscape(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  if (/[";\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
 
+function toCSV(rows: Array<Record<string, unknown>>, headers: string[]): string {
+  const lines = [headers.map(csvEscape).join(";")];
+  for (const r of rows) {
+    lines.push(headers.map((h) => csvEscape(r[h])).join(";"));
+  }
+  return lines.join("\r\n");
+}
+
+function downloadCSV(content: string, filename: string) {
+  // BOM para Excel reconhecer UTF-8 corretamente
+  const blob = new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function exportCSV(lancamentos: Lancamento[], produtor: Produtor | undefined) {
+  const sections: string[] = [];
+
+  // Cabeçalho informativo
+  const info: string[] = [
+    "Labor Rural - Gestão de Custos Operacionais Agrícolas",
+    `Gerado em;${new Date().toLocaleString("pt-BR")}`,
+  ];
+  if (produtor) {
+    info.push(
+      `Produtor;${produtor.nomeCompleto}`,
+      `Propriedade;${produtor.nomePropriedade}`,
+      `Cultura;${produtor.cultura}`,
+      `E-mail;${produtor.email}`,
+    );
+  }
+  sections.push(info.map((l) => l.split(";").map(csvEscape).join(";")).join("\r\n"));
+
+  // Lançamentos
+  const lancHeaders = [
+    "Data",
+    "Atividade",
+    "Elemento de Despesa",
+    "Quantidade",
+    "Valor Total (R$)",
+    "Valor Unitário (R$)",
+    "Observação",
+  ];
   const lancRows = lancamentos.map((l) => ({
     Data: fmtDate(l.data),
     Atividade: l.atividade,
     "Elemento de Despesa": l.elemento_despesa,
     Quantidade: l.quantidade,
-    "Valor Total (R$)": l.valor_total,
-    "Valor Unitário (R$)": l.valor_unitario,
+    "Valor Total (R$)": l.valor_total.toFixed(2).replace(".", ","),
+    "Valor Unitário (R$)": l.valor_unitario.toFixed(2).replace(".", ","),
     Observação: l.observacao,
   }));
-  const ws1 = XLSX.utils.json_to_sheet(lancRows);
-  XLSX.utils.book_append_sheet(wb, ws1, "Lançamentos");
+  sections.push("LANÇAMENTOS\r\n" + toCSV(lancRows, lancHeaders));
 
-  const mensal = resumoMensal(lancamentos).map((r) => ({
+  // Resumo Mensal
+  const mensalRows = resumoMensal(lancamentos).map((r) => ({
     Mês: r.chave,
-    "Quantidade Total": r.quantidade,
-    "Valor Total (R$)": r.total,
-    "Custo Médio Pond.": r.quantidade > 0 ? r.total / r.quantidade : 0,
+    "Quantidade Total": r.quantidade.toFixed(2).replace(".", ","),
+    "Valor Total (R$)": r.total.toFixed(2).replace(".", ","),
+    "Custo Médio Pond.": (r.quantidade > 0 ? r.total / r.quantidade : 0)
+      .toFixed(2)
+      .replace(".", ","),
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mensal), "Resumo Mensal");
+  sections.push(
+    "RESUMO MENSAL\r\n" +
+      toCSV(mensalRows, ["Mês", "Quantidade Total", "Valor Total (R$)", "Custo Médio Pond."]),
+  );
 
-  const anual = resumoAnual(lancamentos).map((r) => ({
+  // Resumo Anual
+  const anualRows = resumoAnual(lancamentos).map((r) => ({
     Ano: r.chave,
-    "Quantidade Total": r.quantidade,
-    "Valor Total (R$)": r.total,
-    "Custo Médio Pond.": r.quantidade > 0 ? r.total / r.quantidade : 0,
+    "Quantidade Total": r.quantidade.toFixed(2).replace(".", ","),
+    "Valor Total (R$)": r.total.toFixed(2).replace(".", ","),
+    "Custo Médio Pond.": (r.quantidade > 0 ? r.total / r.quantidade : 0)
+      .toFixed(2)
+      .replace(".", ","),
   }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(anual), "Resumo Anual");
+  sections.push(
+    "RESUMO ANUAL\r\n" +
+      toCSV(anualRows, ["Ano", "Quantidade Total", "Valor Total (R$)", "Custo Médio Pond."]),
+  );
 
-  const infoRows: Array<{ Campo: string; Valor: string }> = [
-    { Campo: "Empresa", Valor: "Labor Rural" },
-    { Campo: "Relatório", Valor: "Gestão de Custos Operacionais Agrícolas" },
-    { Campo: "Gerado em", Valor: new Date().toLocaleString("pt-BR") },
-  ];
-  if (produtor) {
-    infoRows.push(
-      { Campo: "Produtor", Valor: produtor.nomeCompleto },
-      { Campo: "Propriedade", Valor: produtor.nomePropriedade },
-      { Campo: "Cultura", Valor: produtor.cultura },
-      { Campo: "E-mail", Valor: produtor.email },
-    );
-  }
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(infoRows), "Informações");
-
-  const filename = `labor-rural-custos-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  const filename = `labor-rural-custos-${new Date().toISOString().slice(0, 10)}.csv`;
+  downloadCSV(sections.join("\r\n\r\n"), filename);
 }
 
 export async function exportPDF(lancamentos: Lancamento[], produtor: Produtor | undefined) {

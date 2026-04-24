@@ -6,7 +6,7 @@ import {
   type Lancamento,
   type Produtor,
 } from "@/lib/db";
-import { exportPDF, exportXLSX } from "@/lib/exporters";
+import { exportPDF, exportCSV } from "@/lib/exporters";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -105,10 +105,10 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
               <DropdownMenuItem
                 onClick={() => {
                   if (lancamentos.length === 0) return toast.error("Sem dados para exportar");
-                  exportXLSX(lancamentos, produtor);
+                  exportCSV(lancamentos, produtor);
                 }}
               >
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar XLSX
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar CSV
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
@@ -159,8 +159,8 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
             <Relatorios lancamentos={lancamentos} />
             {lancamentos.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-4">
-                <Button variant="outline" onClick={() => exportXLSX(lancamentos, produtor)}>
-                  <Download className="h-4 w-4" /> XLSX
+                <Button variant="outline" onClick={() => exportCSV(lancamentos, produtor)}>
+                  <Download className="h-4 w-4" /> CSV
                 </Button>
                 <Button variant="outline" onClick={() => exportPDF(lancamentos, produtor)}>
                   <Download className="h-4 w-4" /> PDF
