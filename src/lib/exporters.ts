@@ -48,8 +48,15 @@ export function resumoAtividade(l: Lancamento[]) {
   return agrupar(l, (x) => x.atividade);
 }
 
-export function exportXLSX(lancamentos: Lancamento[], produtor: Produtor | undefined) {
+export async function exportXLSX(lancamentos: Lancamento[], produtor: Produtor | undefined) {
   const wb = XLSX.utils.book_new();
+  wb.Props = {
+    Title: "Gestão de Custos - Labor Rural",
+    Subject: "Custos operacionais agrícolas",
+    Author: "Labor Rural",
+    Company: "Labor Rural",
+    CreatedDate: new Date(),
+  };
 
   const lancRows = lancamentos.map((l) => ({
     Data: fmtDate(l.data),
@@ -79,33 +86,59 @@ export function exportXLSX(lancamentos: Lancamento[], produtor: Produtor | undef
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(anual), "Resumo Anual");
 
+  const infoRows: Array<{ Campo: string; Valor: string }> = [
+    { Campo: "Empresa", Valor: "Labor Rural" },
+    { Campo: "Relatório", Valor: "Gestão de Custos Operacionais Agrícolas" },
+    { Campo: "Gerado em", Valor: new Date().toLocaleString("pt-BR") },
+  ];
   if (produtor) {
-    const info = [
+    infoRows.push(
       { Campo: "Produtor", Valor: produtor.nomeCompleto },
       { Campo: "Propriedade", Valor: produtor.nomePropriedade },
       { Campo: "Cultura", Valor: produtor.cultura },
       { Campo: "E-mail", Valor: produtor.email },
-    ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(info), "Produtor");
+    );
   }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(infoRows), "Informações");
 
-  const filename = `custos-agro-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `labor-rural-custos-${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 
-export function exportPDF(lancamentos: Lancamento[], produtor: Produtor | undefined) {
+export async function exportPDF(lancamentos: Lancamento[], produtor: Produtor | undefined) {
   const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text("Relatório de Custos Operacionais Agrícolas", 14, 18);
+  const logo = await loadLogoDataUrl();
+
+  // Cabeçalho com logo
+  if (logo) {
+    try {
+      doc.addImage(logo, "PNG", 14, 10, 22, 22);
+    } catch {
+      // ignora se falhar
+    }
+  }
+  doc.setFontSize(15);
+  doc.setTextColor(15, 76, 74);
+  doc.text("Gestão de Custos — Labor Rural", 40, 20);
   doc.setFontSize(10);
-  let y = 28;
+  doc.setTextColor(90, 90, 90);
+  doc.text("Relatório de Custos Operacionais Agrícolas", 40, 27);
+  doc.setTextColor(0, 0, 0);
+
+  let y = 40;
   if (produtor) {
+    doc.setFontSize(10);
     doc.text(`Produtor: ${produtor.nomeCompleto}`, 14, y);
     doc.text(`Propriedade: ${produtor.nomePropriedade}`, 14, y + 6);
     doc.text(`Cultura: ${produtor.cultura}`, 14, y + 12);
-    y += 20;
+    doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, y + 18);
+    y += 26;
   }
 
+  const headColor: [number, number, number] = [15, 76, 74];
+
+  doc.setFontSize(12);
+  doc.text("Resumo Mensal", 14, y - 2);
   autoTable(doc, {
     startY: y,
     head: [["Mês", "Qtd Total", "Valor Total", "Custo Médio"]],
@@ -115,11 +148,7 @@ export function exportPDF(lancamentos: Lancamento[], produtor: Produtor | undefi
       brl(r.total),
       r.quantidade > 0 ? brl(r.total / r.quantidade) : "-",
     ]),
-    headStyles: { fillColor: [61, 107, 58] },
-    didDrawPage: () => {
-      doc.setFontSize(12);
-      doc.text("Resumo Mensal", 14, y - 4);
-    },
+    headStyles: { fillColor: headColor },
   });
 
   let lastY = (doc as any).lastAutoTable.finalY + 10;
@@ -134,7 +163,7 @@ export function exportPDF(lancamentos: Lancamento[], produtor: Produtor | undefi
       brl(r.total),
       r.quantidade > 0 ? brl(r.total / r.quantidade) : "-",
     ]),
-    headStyles: { fillColor: [61, 107, 58] },
+    headStyles: { fillColor: headColor },
   });
 
   lastY = (doc as any).lastAutoTable.finalY + 10;
@@ -149,8 +178,21 @@ export function exportPDF(lancamentos: Lancamento[], produtor: Produtor | undefi
       brl(r.total),
       r.quantidade > 0 ? brl(r.total / r.quantidade) : "-",
     ]),
-    headStyles: { fillColor: [61, 107, 58] },
+    headStyles: { fillColor: headColor },
   });
 
-  doc.save(`custos-agro-${new Date().toISOString().slice(0, 10)}.pdf`);
+  // Rodapé em todas as páginas
+  const pageCount = (doc as any).internal.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Labor Rural — Gestão de Custos", 14, pageHeight - 8);
+    doc.text(`Página ${i} de ${pageCount}`, pageWidth - 14, pageHeight - 8, { align: "right" });
+  }
+
+  doc.save(`labor-rural-custos-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
