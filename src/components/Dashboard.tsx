@@ -105,10 +105,10 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
               <DropdownMenuItem
                 onClick={() => {
                   if (lancamentos.length === 0) return toast.error("Sem dados para exportar");
-                  exportXLSX(lancamentos, produtor);
+                  exportCSV(lancamentos, produtor);
                 }}
               >
-                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar XLSX
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Exportar CSV
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
