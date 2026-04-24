@@ -22,6 +22,7 @@ import { Relatorios } from "@/components/Relatorios";
 import { NovoLancamentoSheet } from "@/components/NovoLancamentoSheet";
 import { GerenciarLancamentos } from "@/components/GerenciarLancamentos";
 import { CadastroForm } from "@/components/CadastroForm";
+import logoLabor from "@/assets/logo-labor-rural.png";
 import { toast } from "sonner";
 
 interface Props {
@@ -77,14 +78,19 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
         style={{ background: "var(--gradient-primary)" }}
       >
         <div className="flex justify-between items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-primary-foreground/80 truncate">{produtor.nomePropriedade}</p>
-            <h1 className="text-base font-bold text-primary-foreground truncate">
-              {produtor.nomeCompleto}
-            </h1>
-            <span className="inline-block mt-1 text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full bg-primary-foreground/20 text-primary-foreground">
-              {produtor.cultura}
-            </span>
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="flex-shrink-0 h-11 w-11 rounded-lg bg-white/95 p-1 flex items-center justify-center shadow-sm">
+              <img src={logoLabor} alt="Labor Rural" className="h-full w-full object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] uppercase tracking-wider text-primary-foreground/70 font-semibold">Labor Rural</p>
+              <h1 className="text-sm font-bold text-primary-foreground truncate leading-tight">
+                {produtor.nomeCompleto}
+              </h1>
+              <p className="text-xs text-primary-foreground/80 truncate">
+                {produtor.nomePropriedade} · <span className="font-medium">{produtor.cultura}</span>
+              </p>
+            </div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
