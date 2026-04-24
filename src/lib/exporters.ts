@@ -3,6 +3,22 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Lancamento, Produtor } from "./db";
 import { brl, fmtDate } from "./format";
+import logoLabor from "@/assets/logo-labor-rural.png";
+
+async function loadLogoDataUrl(): Promise<string | null> {
+  try {
+    const res = await fetch(logoLabor);
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
 interface Resumo {
   chave: string;
