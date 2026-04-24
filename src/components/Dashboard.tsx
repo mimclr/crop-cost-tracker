@@ -6,7 +6,7 @@ import {
   type Lancamento,
   type Produtor,
 } from "@/lib/db";
-import { exportPDF, exportXLSX } from "@/lib/exporters";
+import { exportPDF, exportCSV } from "@/lib/exporters";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
