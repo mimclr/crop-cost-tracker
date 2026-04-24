@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sprout, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
+import logoLabor from "@/assets/logo-labor-rural.png";
 
 interface Props {
   onAuthenticated: (email: string) => void;
@@ -39,15 +40,14 @@ export function LoginScreen({ onAuthenticated }: Props) {
     >
       <Card className="w-full max-w-md shadow-[var(--shadow-elevated)]">
         <CardHeader className="text-center">
-          <div
-            className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl"
-            style={{ background: "var(--gradient-primary)" }}
-          >
-            <Sprout className="h-7 w-7 text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl">Custos Agro</CardTitle>
+          <img
+            src={logoLabor}
+            alt="Labor Rural"
+            className="mx-auto mb-3 h-24 w-24 object-contain"
+          />
+          <CardTitle className="text-2xl">Gestão de Custos</CardTitle>
           <CardDescription>
-            Gestão de custos operacionais — Café & Cacau
+            Labor Rural — Custos operacionais agrícolas
           </CardDescription>
         </CardHeader>
         <CardContent>
