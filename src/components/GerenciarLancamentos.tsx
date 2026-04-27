@@ -155,48 +155,57 @@ export function GerenciarLancamentos({ lancamentos, onChange, onEdit }: Props) {
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtrados.map((l) => (
-            <Card key={l.id} className="p-3">
-              <div className="flex justify-between items-start gap-2 mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                    <span>{fmtDate(l.data)}</span>
-                    <span>•</span>
-                    <span className="truncate">{l.atividade}</span>
+          {filtrados.map((l) => {
+            const nomesTalhoes = l.rateios.map((r) => r.talhao_nome);
+            return (
+              <Card key={l.id} className="p-3">
+                <div className="flex justify-between items-start gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                      <span>{fmtDate(l.data)}</span>
+                      <span>•</span>
+                      <span className="truncate">{l.atividade}</span>
+                    </div>
+                    <p className="font-medium truncate">{l.elemento_despesa}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
+                      <span>Qtd: {num(l.quantidade)}</span>
+                      <span>Unit: {brl(l.valor_unitario)}</span>
+                    </div>
+                    {nomesTalhoes.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate">
+                        <span className="font-medium text-foreground/70">Talhões: </span>
+                        {nomesTalhoes.join(", ")}
+                      </p>
+                    )}
+                    {l.observacao && (
+                      <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
+                        {l.observacao}
+                      </p>
+                    )}
                   </div>
-                  <p className="font-medium truncate">{l.elemento_despesa}</p>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
-                    <span>Qtd: {num(l.quantidade)}</span>
-                    <span>Unit: {brl(l.valor_unitario)}</span>
-                  </div>
-                  {l.observacao && (
-                    <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
-                      {l.observacao}
-                    </p>
-                  )}
+                  <p className="font-bold text-primary shrink-0">{brl(l.valor_total)}</p>
                 </div>
-                <p className="font-bold text-primary shrink-0">{brl(l.valor_total)}</p>
-              </div>
-              <div className="flex gap-2 pt-2 border-t">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-8"
-                  onClick={() => onEdit(l)}
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Editar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setConfirmDel(l)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Excluir
-                </Button>
-              </div>
-            </Card>
-          ))}
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8"
+                    onClick={() => onEdit(l)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setConfirmDel(l)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Excluir
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 
