@@ -2,13 +2,28 @@ import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 export type Cultura = "Café" | "Cacau";
 
+export interface Talhao {
+  id: string;
+  nome: string;
+  area: number; // hectares
+}
+
 export interface Produtor {
   id: "default";
   nomeCompleto: string;
   nomePropriedade: string;
   cultura: Cultura;
   email: string;
+  talhoes: Talhao[];
   atualizadoEm: string;
+}
+
+export interface Rateio {
+  talhao_id: string;
+  talhao_nome: string;
+  area: number;
+  quantidade: number;
+  valor: number;
 }
 
 export interface Lancamento {
@@ -20,6 +35,10 @@ export interface Lancamento {
   valor_total: number;
   valor_unitario: number;
   observacao: string;
+  /** ids dos talhões selecionados (vazio = nenhum, todos = informado pela UI) */
+  talhao_ids: string[];
+  /** distribuição proporcional pela área no momento do lançamento */
+  rateios: Rateio[];
   criadoEm: string;
 }
 
@@ -42,16 +61,20 @@ function getDB() {
     throw new Error("IndexedDB unavailable on server");
   }
   if (!dbPromise) {
-    dbPromise = openDB<CustosDB>("custos-agro", 1, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains("produtor")) {
-          db.createObjectStore("produtor", { keyPath: "id" });
+    dbPromise = openDB<CustosDB>("custos-agro", 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          if (!db.objectStoreNames.contains("produtor")) {
+            db.createObjectStore("produtor", { keyPath: "id" });
+          }
+          if (!db.objectStoreNames.contains("lancamentos")) {
+            const store = db.createObjectStore("lancamentos", { keyPath: "id" });
+            store.createIndex("by-data", "data");
+            store.createIndex("by-atividade", "atividade");
+          }
         }
-        if (!db.objectStoreNames.contains("lancamentos")) {
-          const store = db.createObjectStore("lancamentos", { keyPath: "id" });
-          store.createIndex("by-data", "data");
-          store.createIndex("by-atividade", "atividade");
-        }
+        // v2: adiciona talhoes ao produtor e talhao_ids/rateios aos lançamentos
+        // (campos opcionais; normalizamos ao ler/gravar)
       },
     });
   }
@@ -81,15 +104,24 @@ export const ELEMENTOS_SUGERIDOS = [
   "Outros",
 ];
 
-export async function getProdutor(): Promise<Produtor | undefined> {
-  const db = await getDB();
-  return db.get("produtor", "default");
+function normalizarProdutor(p: Produtor | undefined): Produtor | undefined {
+  if (!p) return p;
+  if (!Array.isArray(p.talhoes)) p.talhoes = [];
+  return p;
 }
 
-export async function saveProdutor(p: Omit<Produtor, "id" | "atualizadoEm">): Promise<void> {
+export async function getProdutor(): Promise<Produtor | undefined> {
+  const db = await getDB();
+  return normalizarProdutor(await db.get("produtor", "default"));
+}
+
+export async function saveProdutor(
+  p: Omit<Produtor, "id" | "atualizadoEm">,
+): Promise<void> {
   const db = await getDB();
   await db.put("produtor", {
     ...p,
+    talhoes: Array.isArray(p.talhoes) ? p.talhoes : [],
     id: "default",
     atualizadoEm: new Date().toISOString(),
   });
@@ -98,13 +130,51 @@ export async function saveProdutor(p: Omit<Produtor, "id" | "atualizadoEm">): Pr
 export async function listLancamentos(): Promise<Lancamento[]> {
   const db = await getDB();
   const all = await db.getAll("lancamentos");
+  // normaliza registros antigos sem talhao_ids/rateios
+  for (const l of all) {
+    if (!Array.isArray(l.talhao_ids)) l.talhao_ids = [];
+    if (!Array.isArray(l.rateios)) l.rateios = [];
+  }
   return all.sort((a, b) => b.data.localeCompare(a.data));
 }
 
-export async function addLancamento(l: Omit<Lancamento, "id" | "valor_unitario" | "criadoEm">): Promise<Lancamento> {
+/** Calcula rateios proporcionais pela área de cada talhão selecionado. */
+export function calcularRateios(
+  talhoes: Talhao[],
+  selecionadosIds: string[],
+  quantidade: number,
+  valorTotal: number,
+): Rateio[] {
+  const sel = talhoes.filter((t) => selecionadosIds.includes(t.id) && t.area > 0);
+  const areaTotal = sel.reduce((s, t) => s + t.area, 0);
+  if (areaTotal <= 0) return [];
+  return sel.map((t) => {
+    const peso = t.area / areaTotal;
+    return {
+      talhao_id: t.id,
+      talhao_nome: t.nome,
+      area: t.area,
+      quantidade: quantidade * peso,
+      valor: valorTotal * peso,
+    };
+  });
+}
+
+export type LancamentoInput = Omit<
+  Lancamento,
+  "id" | "valor_unitario" | "criadoEm" | "rateios"
+> & { rateios?: Rateio[] };
+
+export async function addLancamento(
+  l: LancamentoInput,
+  talhoes: Talhao[],
+): Promise<Lancamento> {
   const db = await getDB();
+  const rateios =
+    l.rateios ?? calcularRateios(talhoes, l.talhao_ids, l.quantidade, l.valor_total);
   const novo: Lancamento = {
     ...l,
+    rateios,
     id: crypto.randomUUID(),
     valor_unitario: l.quantidade > 0 ? l.valor_total / l.quantidade : 0,
     criadoEm: new Date().toISOString(),
@@ -115,14 +185,19 @@ export async function addLancamento(l: Omit<Lancamento, "id" | "valor_unitario" 
 
 export async function updateLancamento(
   id: string,
-  patch: Omit<Lancamento, "id" | "valor_unitario" | "criadoEm">,
+  patch: LancamentoInput,
+  talhoes: Talhao[],
 ): Promise<Lancamento> {
   const db = await getDB();
   const existing = await db.get("lancamentos", id);
   if (!existing) throw new Error("Lançamento não encontrado");
+  const rateios =
+    patch.rateios ??
+    calcularRateios(talhoes, patch.talhao_ids, patch.quantidade, patch.valor_total);
   const atualizado: Lancamento = {
     ...existing,
     ...patch,
+    rateios,
     valor_unitario: patch.quantidade > 0 ? patch.valor_total / patch.quantidade : 0,
   };
   await db.put("lancamentos", atualizado);

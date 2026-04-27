@@ -1,18 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ATIVIDADES,
   ELEMENTOS_SUGERIDOS,
   addLancamento,
+  calcularRateios,
   updateLancamento,
   type Lancamento,
+  type Talhao,
 } from "@/lib/db";
-import { todayISO } from "@/lib/format";
+import { brl, todayISO } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 
 interface Props {
@@ -20,11 +35,19 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSaved: (l: Lancamento) => void;
   elementosUsados: string[];
+  talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
 }
 
-export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsados, editing }: Props) {
+export function NovoLancamentoSheet({
+  open,
+  onOpenChange,
+  onSaved,
+  elementosUsados,
+  talhoes,
+  editing,
+}: Props) {
   const isEdit = !!editing;
   const [data, setData] = useState(todayISO());
   const [atividade, setAtividade] = useState<string>(ATIVIDADES[0]);
@@ -32,6 +55,7 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
   const [quantidade, setQuantidade] = useState("");
   const [valorTotal, setValorTotal] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [talhaoIds, setTalhaoIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -43,6 +67,9 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
       setQuantidade(String(editing.quantidade));
       setValorTotal(String(editing.valor_total));
       setObservacao(editing.observacao);
+      // mantém apenas ids ainda existentes
+      const validos = editing.talhao_ids.filter((id) => talhoes.some((t) => t.id === id));
+      setTalhaoIds(validos.length ? validos : talhoes.map((t) => t.id));
     } else {
       setData(todayISO());
       setAtividade(ATIVIDADES[0]);
@@ -50,12 +77,31 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
       setQuantidade("");
       setValorTotal("");
       setObservacao("");
+      // padrão: todos os talhões
+      setTalhaoIds(talhoes.map((t) => t.id));
     }
-  }, [open, editing]);
+  }, [open, editing, talhoes]);
 
   const qtd = parseFloat(quantidade.replace(",", "."));
   const vt = parseFloat(valorTotal.replace(",", "."));
   const vu = qtd > 0 && !isNaN(vt) ? vt / qtd : 0;
+
+  const todosSelecionados = talhoes.length > 0 && talhaoIds.length === talhoes.length;
+
+  const toggleTodos = (checked: boolean) => {
+    setTalhaoIds(checked ? talhoes.map((t) => t.id) : []);
+  };
+
+  const toggleTalhao = (id: string, checked: boolean) => {
+    setTalhaoIds((prev) =>
+      checked ? Array.from(new Set([...prev, id])) : prev.filter((x) => x !== id),
+    );
+  };
+
+  const previewRateios = useMemo(() => {
+    if (!(qtd > 0) || isNaN(vt)) return [];
+    return calcularRateios(talhoes, talhaoIds, qtd, vt);
+  }, [talhoes, talhaoIds, qtd, vt]);
 
   const sugestoes = Array.from(new Set([...ELEMENTOS_SUGERIDOS, ...elementosUsados]));
 
@@ -73,6 +119,10 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
       toast.error("Valor total inválido");
       return;
     }
+    if (talhaoIds.length === 0) {
+      toast.error("Selecione ao menos um talhão");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -82,10 +132,11 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
         quantidade: qtd,
         valor_total: vt,
         observacao: observacao.trim(),
+        talhao_ids: talhaoIds,
       };
       const result = isEdit
-        ? await updateLancamento(editing!.id, payload)
-        : await addLancamento(payload);
+        ? await updateLancamento(editing!.id, payload, talhoes)
+        : await addLancamento(payload, talhoes);
       toast.success(isEdit ? "Lançamento atualizado" : "Lançamento salvo");
       onSaved(result);
       onOpenChange(false);
@@ -181,11 +232,81 @@ export function NovoLancamentoSheet({ open, onOpenChange, onSaved, elementosUsad
           >
             <span className="text-muted-foreground">Valor unitário</span>
             <span className="font-semibold">
-              {vu > 0
-                ? vu.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-                : "—"}
+              {vu > 0 ? brl(vu) : "—"}
             </span>
           </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label>Talhões aplicados</Label>
+              {talhoes.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {talhaoIds.length}/{talhoes.length} selecionados
+                </span>
+              )}
+            </div>
+            {talhoes.length === 0 ? (
+              <p className="text-sm text-muted-foreground rounded-md border p-3">
+                Cadastre talhões em "Editar cadastro" para aplicar despesas.
+              </p>
+            ) : (
+              <div className="rounded-md border divide-y">
+                <label className="flex items-center gap-3 px-3 py-2 cursor-pointer">
+                  <Checkbox
+                    checked={todosSelecionados}
+                    onCheckedChange={(c) => toggleTodos(c === true)}
+                  />
+                  <span className="text-sm font-medium">Todos os talhões</span>
+                </label>
+                {talhoes.map((t) => {
+                  const checked = talhaoIds.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(c) => toggleTalhao(t.id, c === true)}
+                      />
+                      <div className="flex-1 min-w-0 flex justify-between items-center gap-2">
+                        <span className="text-sm truncate">{t.nome}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {t.area.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ha
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {previewRateios.length > 0 && (
+              <div
+                className="rounded-md border p-3 text-xs space-y-1"
+                style={{ background: "var(--muted)" }}
+              >
+                <p className="font-semibold text-foreground mb-1">Rateio proporcional por área</p>
+                {previewRateios.map((r) => (
+                  <div key={r.talhao_id} className="flex justify-between gap-2">
+                    <span className="truncate">
+                      {r.talhao_nome}{" "}
+                      <span className="text-muted-foreground">
+                        ({r.area.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ha)
+                      </span>
+                    </span>
+                    <span className="text-right">
+                      <span className="text-muted-foreground">
+                        {r.quantidade.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} •{" "}
+                      </span>
+                      <span className="font-medium">{brl(r.valor)}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="obs">Observação</Label>
             <Textarea
