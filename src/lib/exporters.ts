@@ -290,6 +290,42 @@ export async function exportPDF(lancamentos: Lancamento[], produtor: Produtor | 
     headStyles: { fillColor: headColor },
   });
 
+  // Totais por talhão (a partir dos rateios)
+  const totaisTalhao = new Map<
+    string,
+    { nome: string; area: number; quantidade: number; valor: number }
+  >();
+  for (const l of lancamentos) {
+    for (const r of l.rateios) {
+      const cur = totaisTalhao.get(r.talhao_id) ?? {
+        nome: r.talhao_nome,
+        area: r.area,
+        quantidade: 0,
+        valor: 0,
+      };
+      cur.quantidade += r.quantidade;
+      cur.valor += r.valor;
+      totaisTalhao.set(r.talhao_id, cur);
+    }
+  }
+  if (totaisTalhao.size > 0) {
+    lastY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.text("Totais por Talhão", 14, lastY - 2);
+    autoTable(doc, {
+      startY: lastY,
+      head: [["Talhão", "Área (ha)", "Qtd", "Valor Total", "Custo/ha"]],
+      body: Array.from(totaisTalhao.values()).map((t) => [
+        t.nome,
+        t.area.toFixed(2),
+        t.quantidade.toFixed(2),
+        brl(t.valor),
+        t.area > 0 ? brl(t.valor / t.area) : "-",
+      ]),
+      headStyles: { fillColor: headColor },
+    });
+  }
+
   // Rodapé em todas as páginas
   const pageCount = (doc as any).internal.getNumberOfPages();
   const pageWidth = doc.internal.pageSize.getWidth();
