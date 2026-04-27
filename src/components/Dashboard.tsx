@@ -190,6 +190,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
           if (!o) setEditingLancamento(null);
         }}
         elementosUsados={elementosUsados}
+        talhoes={produtor.talhoes ?? []}
         editing={editingLancamento}
         onSaved={reload}
       />
