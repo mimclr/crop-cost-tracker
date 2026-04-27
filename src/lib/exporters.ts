@@ -94,6 +94,16 @@ export async function exportCSV(lancamentos: Lancamento[], produtor: Produtor | 
   }
   sections.push(info.map((l) => l.split(";").map(csvEscape).join(";")).join("\r\n"));
 
+  // Talhões
+  if (produtor && produtor.talhoes && produtor.talhoes.length > 0) {
+    const talhHeaders = ["Talhão", "Área (ha)"];
+    const talhRows = produtor.talhoes.map((t) => ({
+      "Talhão": t.nome,
+      "Área (ha)": t.area.toFixed(2).replace(".", ","),
+    }));
+    sections.push("TALHÕES\r\n" + toCSV(talhRows, talhHeaders));
+  }
+
   // Lançamentos
   const lancHeaders = [
     "Data",
@@ -102,18 +112,75 @@ export async function exportCSV(lancamentos: Lancamento[], produtor: Produtor | 
     "Quantidade",
     "Valor Total (R$)",
     "Valor Unitário (R$)",
+    "Talhões",
     "Observação",
   ];
   const lancRows = lancamentos.map((l) => ({
     Data: fmtDate(l.data),
     Atividade: l.atividade,
     "Elemento de Despesa": l.elemento_despesa,
-    Quantidade: l.quantidade,
+    Quantidade: l.quantidade.toFixed(2).replace(".", ","),
     "Valor Total (R$)": l.valor_total.toFixed(2).replace(".", ","),
     "Valor Unitário (R$)": l.valor_unitario.toFixed(2).replace(".", ","),
+    "Talhões": l.rateios.map((r) => r.talhao_nome).join(" | "),
     Observação: l.observacao,
   }));
   sections.push("LANÇAMENTOS\r\n" + toCSV(lancRows, lancHeaders));
+
+  // Rateio por talhão (linha por talhão de cada lançamento)
+  const rateioHeaders = [
+    "Data",
+    "Atividade",
+    "Elemento de Despesa",
+    "Talhão",
+    "Área (ha)",
+    "Quantidade Rateada",
+    "Valor Rateado (R$)",
+  ];
+  const rateioRows: Array<Record<string, unknown>> = [];
+  for (const l of lancamentos) {
+    for (const r of l.rateios) {
+      rateioRows.push({
+        Data: fmtDate(l.data),
+        Atividade: l.atividade,
+        "Elemento de Despesa": l.elemento_despesa,
+        "Talhão": r.talhao_nome,
+        "Área (ha)": r.area.toFixed(2).replace(".", ","),
+        "Quantidade Rateada": r.quantidade.toFixed(2).replace(".", ","),
+        "Valor Rateado (R$)": r.valor.toFixed(2).replace(".", ","),
+      });
+    }
+  }
+  if (rateioRows.length > 0) {
+    sections.push("RATEIO POR TALHÃO\r\n" + toCSV(rateioRows, rateioHeaders));
+  }
+
+  // Totais por talhão
+  const totaisTalhao = new Map<string, { nome: string; area: number; quantidade: number; valor: number }>();
+  for (const l of lancamentos) {
+    for (const r of l.rateios) {
+      const cur = totaisTalhao.get(r.talhao_id) ?? {
+        nome: r.talhao_nome,
+        area: r.area,
+        quantidade: 0,
+        valor: 0,
+      };
+      cur.quantidade += r.quantidade;
+      cur.valor += r.valor;
+      totaisTalhao.set(r.talhao_id, cur);
+    }
+  }
+  if (totaisTalhao.size > 0) {
+    const totHeaders = ["Talhão", "Área (ha)", "Quantidade Total", "Valor Total (R$)", "Custo por ha (R$)"];
+    const totRows = Array.from(totaisTalhao.values()).map((t) => ({
+      "Talhão": t.nome,
+      "Área (ha)": t.area.toFixed(2).replace(".", ","),
+      "Quantidade Total": t.quantidade.toFixed(2).replace(".", ","),
+      "Valor Total (R$)": t.valor.toFixed(2).replace(".", ","),
+      "Custo por ha (R$)": (t.area > 0 ? t.valor / t.area : 0).toFixed(2).replace(".", ","),
+    }));
+    sections.push("TOTAIS POR TALHÃO\r\n" + toCSV(totRows, totHeaders));
+  }
 
   // Resumo Mensal
   const mensalRows = resumoMensal(lancamentos).map((r) => ({
