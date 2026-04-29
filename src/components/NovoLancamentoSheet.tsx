@@ -36,6 +36,8 @@ interface Props {
   onSaved: (l: Lancamento) => void;
   elementosUsados: string[];
   insumosComprados?: string[];
+  /** preço médio (R$/un) por nome de insumo (lowercase como chave) */
+  precoPorInsumo?: Record<string, { preco: number; unidade: string }>;
   talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
@@ -47,6 +49,7 @@ export function NovoLancamentoSheet({
   onSaved,
   elementosUsados,
   insumosComprados = [],
+  precoPorInsumo = {},
   talhoes,
   editing,
 }: Props) {
@@ -84,8 +87,11 @@ export function NovoLancamentoSheet({
     }
   }, [open, editing, talhoes]);
 
+  const insumoMatch = precoPorInsumo[elemento.trim().toLowerCase()];
   const qtd = parseFloat(quantidade.replace(",", "."));
-  const vt = parseFloat(valorTotal.replace(",", "."));
+  const autoValor = insumoMatch && qtd > 0 ? qtd * insumoMatch.preco : null;
+  const vt =
+    autoValor !== null ? autoValor : parseFloat(valorTotal.replace(",", "."));
   const vu = qtd > 0 && !isNaN(vt) ? vt / qtd : 0;
 
   const todosSelecionados = talhoes.length > 0 && talhaoIds.length === talhoes.length;
