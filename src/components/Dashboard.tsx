@@ -212,6 +212,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
           if (!o) setEditingLancamento(null);
         }}
         elementosUsados={elementosUsados}
+        insumosComprados={insumosComprados}
         talhoes={produtor.talhoes ?? []}
         editing={editingLancamento}
         onSaved={reload}
