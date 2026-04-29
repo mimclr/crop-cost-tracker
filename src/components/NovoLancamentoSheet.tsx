@@ -210,7 +210,9 @@ export function NovoLancamentoSheet({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="qtd">Quantidade</Label>
+              <Label htmlFor="qtd">
+                Quantidade {insumoMatch && <span className="text-muted-foreground">({insumoMatch.unidade})</span>}
+              </Label>
               <Input
                 id="qtd"
                 type="number"
@@ -230,12 +232,27 @@ export function NovoLancamentoSheet({
                 inputMode="decimal"
                 step="0.01"
                 min="0"
-                required
-                value={valorTotal}
+                required={!insumoMatch}
+                readOnly={!!insumoMatch}
+                value={
+                  insumoMatch
+                    ? autoValor !== null && autoValor > 0
+                      ? autoValor.toFixed(2)
+                      : ""
+                    : valorTotal
+                }
                 onChange={(e) => setValorTotal(e.target.value)}
+                className={insumoMatch ? "bg-muted cursor-not-allowed" : ""}
+                placeholder={insumoMatch ? "Calculado automaticamente" : ""}
               />
             </div>
           </div>
+          {insumoMatch && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              Calculado automaticamente: quantidade × {brl(insumoMatch.preco)}/{insumoMatch.unidade}{" "}
+              (preço médio de compra).
+            </p>
+          )}
           <div
             className="rounded-lg border p-3 text-sm flex justify-between items-center"
             style={{ background: "var(--muted)" }}
