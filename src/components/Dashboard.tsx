@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { clearSession } from "@/lib/auth";
 import {
   getProdutor,
+  listCompras,
   listLancamentos,
+  type Compra,
   type Lancamento,
   type Produtor,
 } from "@/lib/db";
@@ -22,6 +24,8 @@ import { Relatorios } from "@/components/Relatorios";
 import { NovoLancamentoSheet } from "@/components/NovoLancamentoSheet";
 import { GerenciarLancamentos } from "@/components/GerenciarLancamentos";
 import { CadastroForm } from "@/components/CadastroForm";
+import { Compras } from "@/components/Compras";
+import { Estoque } from "@/components/Estoque";
 import logoLabor from "@/assets/logo-labor-rural.png";
 import { toast } from "sonner";
 
@@ -34,14 +38,17 @@ interface Props {
 
 export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props) {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+  const [compras, setCompras] = useState<Compra[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingLancamento, setEditingLancamento] = useState<Lancamento | null>(null);
   const [editing, setEditing] = useState(false);
+  const [comprasVersion, setComprasVersion] = useState(0);
 
   const reload = async () => {
-    const data = await listLancamentos();
-    setLancamentos(data);
+    const [l, c] = await Promise.all([listLancamentos(), listCompras()]);
+    setLancamentos(l);
+    setCompras(c);
   };
 
   useEffect(() => {
@@ -54,6 +61,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
   };
 
   const elementosUsados = Array.from(new Set(lancamentos.map((l) => l.elemento_despesa)));
+  const insumosComprados = Array.from(new Set(compras.map((c) => c.insumo)));
 
   if (editing) {
     return (
@@ -128,12 +136,23 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
       </header>
 
       <main className="px-4 pt-4">
-        <Tabs defaultValue="gerenciar">
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="gerenciar">Gerenciar</TabsTrigger>
-            <TabsTrigger value="resumo">Resumo</TabsTrigger>
-            <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+        <Tabs defaultValue="compras">
+          <TabsList className="grid grid-cols-5 w-full h-auto">
+            <TabsTrigger value="compras" className="text-xs px-1 py-1.5">Compras</TabsTrigger>
+            <TabsTrigger value="gerenciar" className="text-xs px-1 py-1.5">Registros</TabsTrigger>
+            <TabsTrigger value="estoque" className="text-xs px-1 py-1.5">Estoque</TabsTrigger>
+            <TabsTrigger value="resumo" className="text-xs px-1 py-1.5">Resumo</TabsTrigger>
+            <TabsTrigger value="relatorios" className="text-xs px-1 py-1.5">Relat.</TabsTrigger>
           </TabsList>
+          <TabsContent value="compras" className="mt-4">
+            <Compras
+              key={`compras-${comprasVersion}`}
+              onChange={() => {
+                setComprasVersion((v) => v + 1);
+                reload();
+              }}
+            />
+          </TabsContent>
           <TabsContent value="gerenciar" className="mt-4">
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Carregando...</p>
@@ -147,6 +166,9 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
                 }}
               />
             )}
+          </TabsContent>
+          <TabsContent value="estoque" className="mt-4">
+            <Estoque key={`estoque-${comprasVersion}-${lancamentos.length}`} />
           </TabsContent>
           <TabsContent value="resumo" className="mt-4">
             {loading ? (
@@ -190,6 +212,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
           if (!o) setEditingLancamento(null);
         }}
         elementosUsados={elementosUsados}
+        insumosComprados={insumosComprados}
         talhoes={produtor.talhoes ?? []}
         editing={editingLancamento}
         onSaved={reload}

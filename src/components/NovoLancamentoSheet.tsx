@@ -35,6 +35,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSaved: (l: Lancamento) => void;
   elementosUsados: string[];
+  insumosComprados?: string[];
   talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
@@ -45,6 +46,7 @@ export function NovoLancamentoSheet({
   onOpenChange,
   onSaved,
   elementosUsados,
+  insumosComprados = [],
   talhoes,
   editing,
 }: Props) {
@@ -103,7 +105,9 @@ export function NovoLancamentoSheet({
     return calcularRateios(talhoes, talhaoIds, qtd, vt);
   }, [talhoes, talhaoIds, qtd, vt]);
 
-  const sugestoes = Array.from(new Set([...ELEMENTOS_SUGERIDOS, ...elementosUsados]));
+  const sugestoes = Array.from(
+    new Set([...insumosComprados, ...ELEMENTOS_SUGERIDOS, ...elementosUsados]),
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
