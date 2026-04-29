@@ -231,3 +231,97 @@ export async function deleteLancamento(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("lancamentos", id);
 }
+
+// ============== Compras / Estoque ==============
+
+export type CompraInput = Omit<Compra, "id" | "criadoEm">;
+
+export async function listCompras(): Promise<Compra[]> {
+  const db = await getDB();
+  const all = await db.getAll("compras");
+  return all.sort((a, b) => b.data.localeCompare(a.data));
+}
+
+export async function addCompra(c: CompraInput): Promise<Compra> {
+  const db = await getDB();
+  const novo: Compra = {
+    ...c,
+    insumo: c.insumo.trim(),
+    unidade: c.unidade.trim(),
+    fornecedor: c.fornecedor.trim(),
+    observacao: c.observacao.trim(),
+    id: crypto.randomUUID(),
+    criadoEm: new Date().toISOString(),
+  };
+  await db.put("compras", novo);
+  return novo;
+}
+
+export async function updateCompra(id: string, patch: CompraInput): Promise<Compra> {
+  const db = await getDB();
+  const existing = await db.get("compras", id);
+  if (!existing) throw new Error("Compra não encontrada");
+  const atualizado: Compra = {
+    ...existing,
+    ...patch,
+    insumo: patch.insumo.trim(),
+    unidade: patch.unidade.trim(),
+    fornecedor: patch.fornecedor.trim(),
+    observacao: patch.observacao.trim(),
+  };
+  await db.put("compras", atualizado);
+  return atualizado;
+}
+
+export async function deleteCompra(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("compras", id);
+}
+
+export interface EstoqueItem {
+  insumo: string;
+  unidade: string;
+  comprado: number;
+  consumido: number;
+  saldo: number;
+  valorComprado: number;
+  precoMedio: number;
+}
+
+/** Calcula saldo por insumo: comprado - consumido (lançamentos cujo elemento_despesa = insumo). */
+export function calcularEstoque(compras: Compra[], lancamentos: Lancamento[]): EstoqueItem[] {
+  const map = new Map<string, EstoqueItem>();
+  const key = (s: string) => s.trim().toLowerCase();
+
+  for (const c of compras) {
+    const k = key(c.insumo);
+    const cur = map.get(k) ?? {
+      insumo: c.insumo,
+      unidade: c.unidade,
+      comprado: 0,
+      consumido: 0,
+      saldo: 0,
+      valorComprado: 0,
+      precoMedio: 0,
+    };
+    cur.comprado += c.quantidade;
+    cur.valorComprado += c.quantidade * c.preco_unitario;
+    if (!cur.unidade) cur.unidade = c.unidade;
+    map.set(k, cur);
+  }
+
+  for (const l of lancamentos) {
+    const k = key(l.elemento_despesa);
+    const cur = map.get(k);
+    if (!cur) continue; // só consome se houve compra registrada
+    cur.consumido += l.quantidade;
+  }
+
+  return Array.from(map.values())
+    .map((it) => ({
+      ...it,
+      saldo: it.comprado - it.consumido,
+      precoMedio: it.comprado > 0 ? it.valorComprado / it.comprado : 0,
+    }))
+    .sort((a, b) => a.insumo.localeCompare(b.insumo));
+}
