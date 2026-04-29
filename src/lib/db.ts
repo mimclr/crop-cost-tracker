@@ -42,6 +42,18 @@ export interface Lancamento {
   criadoEm: string;
 }
 
+export interface Compra {
+  id: string;
+  data: string; // ISO yyyy-mm-dd
+  insumo: string; // nome do insumo (também vira elemento_despesa)
+  unidade: string; // ex: kg, L, sc, un
+  quantidade: number; // quantidade adquirida
+  preco_unitario: number; // R$ por unidade
+  fornecedor: string;
+  observacao: string;
+  criadoEm: string;
+}
+
 interface CustosDB extends DBSchema {
   produtor: {
     key: string;
@@ -52,6 +64,11 @@ interface CustosDB extends DBSchema {
     value: Lancamento;
     indexes: { "by-data": string; "by-atividade": string };
   };
+  compras: {
+    key: string;
+    value: Compra;
+    indexes: { "by-data": string; "by-insumo": string };
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<CustosDB>> | null = null;
@@ -61,7 +78,7 @@ function getDB() {
     throw new Error("IndexedDB unavailable on server");
   }
   if (!dbPromise) {
-    dbPromise = openDB<CustosDB>("custos-agro", 2, {
+    dbPromise = openDB<CustosDB>("custos-agro", 3, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           if (!db.objectStoreNames.contains("produtor")) {
@@ -73,8 +90,14 @@ function getDB() {
             store.createIndex("by-atividade", "atividade");
           }
         }
-        // v2: adiciona talhoes ao produtor e talhao_ids/rateios aos lançamentos
-        // (campos opcionais; normalizamos ao ler/gravar)
+        // v2: campos opcionais talhoes/rateios (normalizados em runtime)
+        if (oldVersion < 3) {
+          if (!db.objectStoreNames.contains("compras")) {
+            const store = db.createObjectStore("compras", { keyPath: "id" });
+            store.createIndex("by-data", "data");
+            store.createIndex("by-insumo", "insumo");
+          }
+        }
       },
     });
   }
