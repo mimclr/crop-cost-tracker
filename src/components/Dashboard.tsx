@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { clearSession } from "@/lib/auth";
 import {
   getProdutor,
+  listCompras,
   listLancamentos,
+  type Compra,
   type Lancamento,
   type Produtor,
 } from "@/lib/db";
@@ -22,6 +24,8 @@ import { Relatorios } from "@/components/Relatorios";
 import { NovoLancamentoSheet } from "@/components/NovoLancamentoSheet";
 import { GerenciarLancamentos } from "@/components/GerenciarLancamentos";
 import { CadastroForm } from "@/components/CadastroForm";
+import { Compras } from "@/components/Compras";
+import { Estoque } from "@/components/Estoque";
 import logoLabor from "@/assets/logo-labor-rural.png";
 import { toast } from "sonner";
 
