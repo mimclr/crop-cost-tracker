@@ -62,6 +62,22 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
 
   const elementosUsados = Array.from(new Set(lancamentos.map((l) => l.elemento_despesa)));
   const insumosComprados = Array.from(new Set(compras.map((c) => c.insumo)));
+  const precoPorInsumo: Record<string, { preco: number; unidade: string }> = (() => {
+    const acc: Record<string, { qtd: number; total: number; unidade: string }> = {};
+    for (const c of compras) {
+      const k = c.insumo.trim().toLowerCase();
+      const cur = acc[k] ?? { qtd: 0, total: 0, unidade: c.unidade };
+      cur.qtd += c.quantidade;
+      cur.total += c.quantidade * c.preco_unitario;
+      if (!cur.unidade) cur.unidade = c.unidade;
+      acc[k] = cur;
+    }
+    const out: Record<string, { preco: number; unidade: string }> = {};
+    for (const [k, v] of Object.entries(acc)) {
+      out[k] = { preco: v.qtd > 0 ? v.total / v.qtd : 0, unidade: v.unidade };
+    }
+    return out;
+  })();
 
   if (editing) {
     return (
@@ -213,6 +229,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
         }}
         elementosUsados={elementosUsados}
         insumosComprados={insumosComprados}
+        precoPorInsumo={precoPorInsumo}
         talhoes={produtor.talhoes ?? []}
         editing={editingLancamento}
         onSaved={reload}
