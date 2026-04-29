@@ -136,12 +136,23 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
       </header>
 
       <main className="px-4 pt-4">
-        <Tabs defaultValue="gerenciar">
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="gerenciar">Gerenciar</TabsTrigger>
-            <TabsTrigger value="resumo">Resumo</TabsTrigger>
-            <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+        <Tabs defaultValue="compras">
+          <TabsList className="grid grid-cols-5 w-full h-auto">
+            <TabsTrigger value="compras" className="text-xs px-1 py-1.5">Compras</TabsTrigger>
+            <TabsTrigger value="gerenciar" className="text-xs px-1 py-1.5">Registros</TabsTrigger>
+            <TabsTrigger value="estoque" className="text-xs px-1 py-1.5">Estoque</TabsTrigger>
+            <TabsTrigger value="resumo" className="text-xs px-1 py-1.5">Resumo</TabsTrigger>
+            <TabsTrigger value="relatorios" className="text-xs px-1 py-1.5">Relat.</TabsTrigger>
           </TabsList>
+          <TabsContent value="compras" className="mt-4">
+            <Compras
+              key={`compras-${comprasVersion}`}
+              onChange={() => {
+                setComprasVersion((v) => v + 1);
+                reload();
+              }}
+            />
+          </TabsContent>
           <TabsContent value="gerenciar" className="mt-4">
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Carregando...</p>
@@ -155,6 +166,9 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
                 }}
               />
             )}
+          </TabsContent>
+          <TabsContent value="estoque" className="mt-4">
+            <Estoque key={`estoque-${comprasVersion}-${lancamentos.length}`} />
           </TabsContent>
           <TabsContent value="resumo" className="mt-4">
             {loading ? (
