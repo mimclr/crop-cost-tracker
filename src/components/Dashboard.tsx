@@ -38,14 +38,17 @@ interface Props {
 
 export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props) {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
+  const [compras, setCompras] = useState<Compra[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingLancamento, setEditingLancamento] = useState<Lancamento | null>(null);
   const [editing, setEditing] = useState(false);
+  const [comprasVersion, setComprasVersion] = useState(0);
 
   const reload = async () => {
-    const data = await listLancamentos();
-    setLancamentos(data);
+    const [l, c] = await Promise.all([listLancamentos(), listCompras()]);
+    setLancamentos(l);
+    setCompras(c);
   };
 
   useEffect(() => {
@@ -58,6 +61,7 @@ export function Dashboard({ email, produtor, onProdutorChange, onLogout }: Props
   };
 
   const elementosUsados = Array.from(new Set(lancamentos.map((l) => l.elemento_despesa)));
+  const insumosComprados = Array.from(new Set(compras.map((c) => c.insumo)));
 
   if (editing) {
     return (
