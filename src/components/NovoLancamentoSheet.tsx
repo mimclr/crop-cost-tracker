@@ -194,6 +194,12 @@ export function NovoLancamentoSheet({
       toast.error("Quantidade deve ser maior que zero");
       return;
     }
+    if (isInsumoComprado && qtd > saldoEstoque + 1e-9) {
+      toast.error(
+        `Quantidade (${qtd.toLocaleString("pt-BR")}) excede o estoque disponível (${saldoEstoque.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}).`,
+      );
+      return;
+    }
     const vtFinal = isInsumoComprado ? qtd * vu : vtManual;
     if (isInsumoComprado && (isNaN(vu) || vu < 0)) {
       toast.error("Valor unitário inválido");
