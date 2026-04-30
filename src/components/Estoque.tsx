@@ -9,8 +9,15 @@ import {
 } from "@/lib/db";
 import { brl, num } from "@/lib/format";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Package, Search, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Package, X } from "lucide-react";
 
 export function Estoque() {
   const [compras, setCompras] = useState<Compra[]>([]);
@@ -32,10 +39,23 @@ export function Estoque() {
     [compras, lancamentos],
   );
 
+  const elementosRegistrados = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of lancamentos) {
+      const v = l.elemento_despesa?.trim();
+      if (v) set.add(v);
+    }
+    // intersecciona com itens existentes para mostrar apenas insumos com estoque
+    const itensSet = new Set(itens.map((i) => i.insumo.toLowerCase()));
+    return Array.from(set)
+      .filter((e) => itensSet.has(e.toLowerCase()))
+      .sort((a, b) => a.localeCompare(b));
+  }, [lancamentos, itens]);
+
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase();
     if (!t) return itens;
-    return itens.filter((i) => i.insumo.toLowerCase().includes(t));
+    return itens.filter((i) => i.insumo.toLowerCase() === t);
   }, [itens, busca]);
 
   const totais = filtrados.reduce(
@@ -55,23 +75,33 @@ export function Estoque() {
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar insumo..."
-          className="pl-9 pr-9"
-        />
+      <div className="flex gap-2">
+        <Select
+          value={busca || "__all__"}
+          onValueChange={(v) => setBusca(v === "__all__" ? "" : v)}
+        >
+          <SelectTrigger className="flex-1">
+            <SelectValue placeholder="Filtrar por insumo do registro..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todos os insumos</SelectItem>
+            {elementosRegistrados.map((e) => (
+              <SelectItem key={e} value={e}>
+                {e}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {busca && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => setBusca("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-            aria-label="Limpar busca"
+            aria-label="Limpar filtro"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
