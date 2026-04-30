@@ -53,6 +53,7 @@ export function NovoLancamentoSheet({
   elementosUsados,
   insumosComprados = [],
   compras = [],
+  lancamentos = [],
   talhoes,
   editing,
 }: Props) {
