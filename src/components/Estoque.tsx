@@ -70,13 +70,19 @@ export function Estoque() {
         <Select
           value={busca || "__all__"}
           onValueChange={(v) => setBusca(v === "__all__" ? "" : v)}
+          disabled={insumosUnicos.length === 0}
         >
           <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Filtrar por insumo do registro..." />
+            <SelectValue
+              placeholder={
+                insumosUnicos.length === 0
+                  ? "Nenhum insumo no estoque"
+                  : "Filtrar por insumo..."
+              }
+            />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todos os insumos</SelectItem>
-            {elementosRegistrados.map((e) => (
+            {insumosUnicos.map((e) => (
               <SelectItem key={e} value={e}>
                 {e}
               </SelectItem>
