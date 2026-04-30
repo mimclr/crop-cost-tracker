@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getSessionEmail } from "@/lib/auth";
 import { getProdutor, type Produtor } from "@/lib/db";
-import { LoginScreen } from "@/components/LoginScreen";
 import { CadastroForm } from "@/components/CadastroForm";
 import { Dashboard } from "@/components/Dashboard";
 import { Toaster } from "@/components/ui/sonner";
@@ -11,21 +9,16 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Stage = "loading" | "login" | "cadastro" | "dashboard";
+type Stage = "loading" | "cadastro" | "dashboard";
+
+const DEFAULT_EMAIL = "produtor@laborrural.com";
 
 function Index() {
   const [stage, setStage] = useState<Stage>("loading");
-  const [email, setEmail] = useState<string>("");
   const [produtor, setProdutor] = useState<Produtor | null>(null);
 
   useEffect(() => {
     (async () => {
-      const sess = getSessionEmail();
-      if (!sess) {
-        setStage("login");
-        return;
-      }
-      setEmail(sess);
       const p = await getProdutor();
       if (p) {
         setProdutor(p);
@@ -35,17 +28,6 @@ function Index() {
       }
     })();
   }, []);
-
-  const handleAuth = async (e: string) => {
-    setEmail(e);
-    const p = await getProdutor();
-    if (p) {
-      setProdutor(p);
-      setStage("dashboard");
-    } else {
-      setStage("cadastro");
-    }
-  };
 
   return (
     <>
@@ -57,10 +39,9 @@ function Index() {
           <p className="text-muted-foreground">Carregando...</p>
         </div>
       )}
-      {stage === "login" && <LoginScreen onAuthenticated={handleAuth} />}
       {stage === "cadastro" && (
         <CadastroForm
-          email={email}
+          email={DEFAULT_EMAIL}
           onSaved={async () => {
             const p = await getProdutor();
             if (p) {
@@ -72,13 +53,12 @@ function Index() {
       )}
       {stage === "dashboard" && produtor && (
         <Dashboard
-          email={email}
+          email={produtor.email || DEFAULT_EMAIL}
           produtor={produtor}
           onProdutorChange={setProdutor}
           onLogout={() => {
             setProdutor(null);
-            setEmail("");
-            setStage("login");
+            setStage("cadastro");
           }}
         />
       )}
