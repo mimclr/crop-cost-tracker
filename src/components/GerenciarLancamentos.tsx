@@ -36,21 +36,25 @@ export function GerenciarLancamentos({ lancamentos, onChange, onEdit }: Props) {
   const [atividade, setAtividade] = useState<string>("todas");
   const [confirmDel, setConfirmDel] = useState<Lancamento | null>(null);
 
+  const elementosUnicos = useMemo(
+    () =>
+      Array.from(
+        new Set(lancamentos.map((l) => l.elemento_despesa.trim()).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [lancamentos],
+  );
+
   const anos = useMemo(
     () => Array.from(new Set(lancamentos.map((l) => l.data.slice(0, 4)))).sort().reverse(),
     [lancamentos],
   );
 
   const filtrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
     return lancamentos.filter((l) => {
       if (ano !== "todos" && l.data.slice(0, 4) !== ano) return false;
       if (mes !== "todos" && l.data.slice(5, 7) !== mes) return false;
       if (atividade !== "todas" && l.atividade !== atividade) return false;
-      if (termo) {
-        const blob = `${l.elemento_despesa} ${l.atividade} ${l.observacao} ${l.data}`.toLowerCase();
-        if (!blob.includes(termo)) return false;
-      }
+      if (busca && l.elemento_despesa.trim().toLowerCase() !== busca.toLowerCase()) return false;
       return true;
     });
   }, [lancamentos, mes, ano, atividade, busca]);
