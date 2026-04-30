@@ -75,13 +75,30 @@ export function CadastroForm({ email, initial, onSaved, onCancel, title }: Props
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (talhoes.length === 0) {
+    // Inclui talhão pendente nos campos (caso usuário tenha esquecido de clicar em "+")
+    let listaFinal = talhoes;
+    const nomePend = novoNome.trim();
+    const areaPend = parseFloat(novaArea.replace(",", "."));
+    if (nomePend && areaPend > 0) {
+      if (talhoes.some((t) => t.nome.toLowerCase() === nomePend.toLowerCase())) {
+        toast.error("Já existe um talhão com esse nome");
+        return;
+      }
+      listaFinal = [...talhoes, { id: crypto.randomUUID(), nome: nomePend, area: areaPend }];
+      setTalhoes(listaFinal);
+      setNovoNome("");
+      setNovaArea("");
+    } else if (nomePend || novaArea.trim()) {
+      toast.error("Preencha nome e área do talhão pendente, ou limpe os campos");
+      return;
+    }
+    if (listaFinal.length === 0) {
       toast.error("Cadastre ao menos um talhão");
       return;
     }
     setSaving(true);
     try {
-      await saveProdutor({ nomeCompleto, nomePropriedade, cultura, email, talhoes });
+      await saveProdutor({ nomeCompleto, nomePropriedade, cultura, email, talhoes: listaFinal });
       toast.success("Cadastro salvo");
       onSaved();
     } catch {

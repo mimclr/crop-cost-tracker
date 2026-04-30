@@ -20,6 +20,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Pencil, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 const UNIDADES_SUGERIDAS = ["kg", "g", "L", "mL", "sc", "un", "t", "ha"];
@@ -55,12 +62,19 @@ export function Compras({ onChange }: Props) {
     reload().finally(() => setLoading(false));
   }, []);
 
+  const insumosUnicos = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of compras) {
+      const v = c.insumo?.trim();
+      if (v) set.add(v);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [compras]);
+
   const filtradas = useMemo(() => {
-    const t = busca.trim().toLowerCase();
-    if (!t) return compras;
-    return compras.filter((c) =>
-      `${c.insumo} ${c.fornecedor} ${c.observacao} ${c.unidade}`.toLowerCase().includes(t),
-    );
+    if (!busca) return compras;
+    const t = busca.toLowerCase();
+    return compras.filter((c) => c.insumo.trim().toLowerCase() === t);
   }, [compras, busca]);
 
   const totalGasto = filtradas.reduce((s, c) => s + c.quantidade * c.preco_unitario, 0);
@@ -80,23 +94,39 @@ export function Compras({ onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar insumo, fornecedor..."
-          className="pl-9 pr-9"
-        />
+      <div className="flex gap-2">
+        <Select
+          value={busca || "__all__"}
+          onValueChange={(v) => setBusca(v === "__all__" ? "" : v)}
+          disabled={insumosUnicos.length === 0}
+        >
+          <SelectTrigger className="flex-1">
+            <SelectValue
+              placeholder={
+                insumosUnicos.length === 0
+                  ? "Nenhum insumo registrado"
+                  : "Filtrar por insumo..."
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {insumosUnicos.map((i) => (
+              <SelectItem key={i} value={i}>
+                {i}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {busca && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => setBusca("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-            aria-label="Limpar busca"
+            aria-label="Limpar filtro"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 

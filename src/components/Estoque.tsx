@@ -39,18 +39,9 @@ export function Estoque() {
     [compras, lancamentos],
   );
 
-  const elementosRegistrados = useMemo(() => {
-    const set = new Set<string>();
-    for (const l of lancamentos) {
-      const v = l.elemento_despesa?.trim();
-      if (v) set.add(v);
-    }
-    // intersecciona com itens existentes para mostrar apenas insumos com estoque
-    const itensSet = new Set(itens.map((i) => i.insumo.toLowerCase()));
-    return Array.from(set)
-      .filter((e) => itensSet.has(e.toLowerCase()))
-      .sort((a, b) => a.localeCompare(b));
-  }, [lancamentos, itens]);
+  const insumosUnicos = useMemo(() => {
+    return itens.map((i) => i.insumo).sort((a, b) => a.localeCompare(b));
+  }, [itens]);
 
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase();
@@ -79,13 +70,19 @@ export function Estoque() {
         <Select
           value={busca || "__all__"}
           onValueChange={(v) => setBusca(v === "__all__" ? "" : v)}
+          disabled={insumosUnicos.length === 0}
         >
           <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Filtrar por insumo do registro..." />
+            <SelectValue
+              placeholder={
+                insumosUnicos.length === 0
+                  ? "Nenhum insumo no estoque"
+                  : "Filtrar por insumo..."
+              }
+            />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">Todos os insumos</SelectItem>
-            {elementosRegistrados.map((e) => (
+            {insumosUnicos.map((e) => (
               <SelectItem key={e} value={e}>
                 {e}
               </SelectItem>

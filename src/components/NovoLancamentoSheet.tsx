@@ -40,6 +40,7 @@ interface Props {
   elementosUsados: string[];
   insumosComprados?: string[];
   compras?: Compra[];
+  lancamentos?: Lancamento[];
   talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
@@ -52,6 +53,7 @@ export function NovoLancamentoSheet({
   elementosUsados,
   insumosComprados = [],
   compras = [],
+  lancamentos = [],
   talhoes,
   editing,
 }: Props) {
@@ -90,6 +92,21 @@ export function NovoLancamentoSheet({
 
   const elementoKey = elemento.trim().toLowerCase();
   const isInsumoComprado = insumoInfo.has(elementoKey);
+
+  // Saldo em estoque do insumo selecionado (desconsidera o próprio lançamento em edição)
+  const saldoEstoque = useMemo(() => {
+    if (!isInsumoComprado) return Infinity;
+    let comprado = 0;
+    for (const c of compras) {
+      if (c.insumo.trim().toLowerCase() === elementoKey) comprado += c.quantidade;
+    }
+    let consumido = 0;
+    for (const l of lancamentos) {
+      if (editing && l.id === editing.id) continue;
+      if (l.elemento_despesa.trim().toLowerCase() === elementoKey) consumido += l.quantidade;
+    }
+    return Math.max(0, comprado - consumido);
+  }, [isInsumoComprado, compras, lancamentos, elementoKey, editing]);
 
   useEffect(() => {
     if (!open) return;
@@ -175,6 +192,12 @@ export function NovoLancamentoSheet({
     }
     if (!(qtd > 0)) {
       toast.error("Quantidade deve ser maior que zero");
+      return;
+    }
+    if (isInsumoComprado && qtd > saldoEstoque + 1e-9) {
+      toast.error(
+        `Quantidade (${qtd.toLocaleString("pt-BR")}) excede o estoque disponível (${saldoEstoque.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}).`,
+      );
       return;
     }
     const vtFinal = isInsumoComprado ? qtd * vu : vtManual;
@@ -274,17 +297,38 @@ export function NovoLancamentoSheet({
 
           <div className="grid grid-cols-[1fr_120px] gap-3">
             <div className="space-y-2">
-              <Label htmlFor="qtd">Quantidade</Label>
+              <div className="flex justify-between items-baseline gap-2">
+                <Label htmlFor="qtd">Quantidade</Label>
+                {isInsumoComprado && (
+                  <span
+                    className={`text-[11px] ${
+                      qtd > saldoEstoque + 1e-9
+                        ? "text-destructive font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    Disp.: {saldoEstoque.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}{" "}
+                    {unidade}
+                  </span>
+                )}
+              </div>
               <Input
                 id="qtd"
                 type="number"
                 inputMode="decimal"
                 step="0.01"
                 min="0.01"
+                max={isInsumoComprado ? saldoEstoque : undefined}
                 required
                 value={quantidade}
                 onChange={(e) => setQuantidade(e.target.value)}
+                aria-invalid={isInsumoComprado && qtd > saldoEstoque + 1e-9}
               />
+              {isInsumoComprado && qtd > saldoEstoque + 1e-9 && (
+                <p className="text-[11px] text-destructive">
+                  Quantidade excede o estoque disponível.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="un">Unidade</Label>

@@ -4,7 +4,6 @@ import { ATIVIDADES, deleteLancamento } from "@/lib/db";
 import { brl, fmtDate, num } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
@@ -16,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Search, Trash2, X } from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -37,21 +36,25 @@ export function GerenciarLancamentos({ lancamentos, onChange, onEdit }: Props) {
   const [atividade, setAtividade] = useState<string>("todas");
   const [confirmDel, setConfirmDel] = useState<Lancamento | null>(null);
 
+  const elementosUnicos = useMemo(
+    () =>
+      Array.from(
+        new Set(lancamentos.map((l) => l.elemento_despesa.trim()).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [lancamentos],
+  );
+
   const anos = useMemo(
     () => Array.from(new Set(lancamentos.map((l) => l.data.slice(0, 4)))).sort().reverse(),
     [lancamentos],
   );
 
   const filtrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
     return lancamentos.filter((l) => {
       if (ano !== "todos" && l.data.slice(0, 4) !== ano) return false;
       if (mes !== "todos" && l.data.slice(5, 7) !== mes) return false;
       if (atividade !== "todas" && l.atividade !== atividade) return false;
-      if (termo) {
-        const blob = `${l.elemento_despesa} ${l.atividade} ${l.observacao} ${l.data}`.toLowerCase();
-        if (!blob.includes(termo)) return false;
-      }
+      if (busca && l.elemento_despesa.trim().toLowerCase() !== busca.toLowerCase()) return false;
       return true;
     });
   }, [lancamentos, mes, ano, atividade, busca]);
@@ -77,23 +80,39 @@ export function GerenciarLancamentos({ lancamentos, onChange, onEdit }: Props) {
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        <Input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por elemento, atividade, observação..."
-          className="pl-9 pr-9"
-        />
+      <div className="flex gap-2">
+        <Select
+          value={busca || "__all__"}
+          onValueChange={(v) => setBusca(v === "__all__" ? "" : v)}
+          disabled={elementosUnicos.length === 0}
+        >
+          <SelectTrigger className="flex-1">
+            <SelectValue
+              placeholder={
+                elementosUnicos.length === 0
+                  ? "Nenhum elemento registrado"
+                  : "Filtrar por elemento de despesa..."
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {elementosUnicos.map((e) => (
+              <SelectItem key={e} value={e}>
+                {e}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {busca && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="icon"
             onClick={() => setBusca("")}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-            aria-label="Limpar busca"
+            aria-label="Limpar filtro"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
