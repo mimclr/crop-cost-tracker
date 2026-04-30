@@ -20,6 +20,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Plus, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Pencil, Plus, ShoppingCart, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 const UNIDADES_SUGERIDAS = ["kg", "g", "L", "mL", "sc", "un", "t", "ha"];
