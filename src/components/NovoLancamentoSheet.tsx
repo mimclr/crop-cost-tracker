@@ -36,8 +36,6 @@ interface Props {
   onSaved: (l: Lancamento) => void;
   elementosUsados: string[];
   insumosComprados?: string[];
-  /** preço médio (R$/un) por nome de insumo (lowercase como chave) */
-  precoPorInsumo?: Record<string, { preco: number; unidade: string }>;
   talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
@@ -49,7 +47,6 @@ export function NovoLancamentoSheet({
   onSaved,
   elementosUsados,
   insumosComprados = [],
-  precoPorInsumo = {},
   talhoes,
   editing,
 }: Props) {
@@ -87,11 +84,8 @@ export function NovoLancamentoSheet({
     }
   }, [open, editing, talhoes]);
 
-  const insumoMatch = precoPorInsumo[elemento.trim().toLowerCase()];
   const qtd = parseFloat(quantidade.replace(",", "."));
-  const autoValor = insumoMatch && qtd > 0 ? qtd * insumoMatch.preco : null;
-  const vt =
-    autoValor !== null ? autoValor : parseFloat(valorTotal.replace(",", "."));
+  const vt = parseFloat(valorTotal.replace(",", "."));
   const vu = qtd > 0 && !isNaN(vt) ? vt / qtd : 0;
 
   const todosSelecionados = talhoes.length > 0 && talhaoIds.length === talhoes.length;
@@ -210,9 +204,7 @@ export function NovoLancamentoSheet({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="qtd">
-                Quantidade {insumoMatch && <span className="text-muted-foreground">({insumoMatch.unidade})</span>}
-              </Label>
+              <Label htmlFor="qtd">Quantidade</Label>
               <Input
                 id="qtd"
                 type="number"
@@ -232,27 +224,12 @@ export function NovoLancamentoSheet({
                 inputMode="decimal"
                 step="0.01"
                 min="0"
-                required={!insumoMatch}
-                readOnly={!!insumoMatch}
-                value={
-                  insumoMatch
-                    ? autoValor !== null && autoValor > 0
-                      ? autoValor.toFixed(2)
-                      : ""
-                    : valorTotal
-                }
+                required
+                value={valorTotal}
                 onChange={(e) => setValorTotal(e.target.value)}
-                className={insumoMatch ? "bg-muted cursor-not-allowed" : ""}
-                placeholder={insumoMatch ? "Calculado automaticamente" : ""}
               />
             </div>
           </div>
-          {insumoMatch && (
-            <p className="text-xs text-muted-foreground -mt-2">
-              Calculado automaticamente: quantidade × {brl(insumoMatch.preco)}/{insumoMatch.unidade}{" "}
-              (preço médio de compra).
-            </p>
-          )}
           <div
             className="rounded-lg border p-3 text-sm flex justify-between items-center"
             style={{ background: "var(--muted)" }}
