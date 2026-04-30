@@ -39,18 +39,9 @@ export function Estoque() {
     [compras, lancamentos],
   );
 
-  const elementosRegistrados = useMemo(() => {
-    const set = new Set<string>();
-    for (const l of lancamentos) {
-      const v = l.elemento_despesa?.trim();
-      if (v) set.add(v);
-    }
-    // intersecciona com itens existentes para mostrar apenas insumos com estoque
-    const itensSet = new Set(itens.map((i) => i.insumo.toLowerCase()));
-    return Array.from(set)
-      .filter((e) => itensSet.has(e.toLowerCase()))
-      .sort((a, b) => a.localeCompare(b));
-  }, [lancamentos, itens]);
+  const insumosUnicos = useMemo(() => {
+    return itens.map((i) => i.insumo).sort((a, b) => a.localeCompare(b));
+  }, [itens]);
 
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase();
