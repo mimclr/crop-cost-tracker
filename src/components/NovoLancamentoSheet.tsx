@@ -93,6 +93,21 @@ export function NovoLancamentoSheet({
   const elementoKey = elemento.trim().toLowerCase();
   const isInsumoComprado = insumoInfo.has(elementoKey);
 
+  // Saldo em estoque do insumo selecionado (desconsidera o próprio lançamento em edição)
+  const saldoEstoque = useMemo(() => {
+    if (!isInsumoComprado) return Infinity;
+    let comprado = 0;
+    for (const c of compras) {
+      if (c.insumo.trim().toLowerCase() === elementoKey) comprado += c.quantidade;
+    }
+    let consumido = 0;
+    for (const l of lancamentos) {
+      if (editing && l.id === editing.id) continue;
+      if (l.elemento_despesa.trim().toLowerCase() === elementoKey) consumido += l.quantidade;
+    }
+    return Math.max(0, comprado - consumido);
+  }, [isInsumoComprado, compras, lancamentos, elementoKey, editing]);
+
   useEffect(() => {
     if (!open) return;
     if (editing) {
