@@ -297,17 +297,38 @@ export function NovoLancamentoSheet({
 
           <div className="grid grid-cols-[1fr_120px] gap-3">
             <div className="space-y-2">
-              <Label htmlFor="qtd">Quantidade</Label>
+              <div className="flex justify-between items-baseline gap-2">
+                <Label htmlFor="qtd">Quantidade</Label>
+                {isInsumoComprado && (
+                  <span
+                    className={`text-[11px] ${
+                      qtd > saldoEstoque + 1e-9
+                        ? "text-destructive font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    Disp.: {saldoEstoque.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}{" "}
+                    {unidade}
+                  </span>
+                )}
+              </div>
               <Input
                 id="qtd"
                 type="number"
                 inputMode="decimal"
                 step="0.01"
                 min="0.01"
+                max={isInsumoComprado ? saldoEstoque : undefined}
                 required
                 value={quantidade}
                 onChange={(e) => setQuantidade(e.target.value)}
+                aria-invalid={isInsumoComprado && qtd > saldoEstoque + 1e-9}
               />
+              {isInsumoComprado && qtd > saldoEstoque + 1e-9 && (
+                <p className="text-[11px] text-destructive">
+                  Quantidade excede o estoque disponível.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="un">Unidade</Label>
