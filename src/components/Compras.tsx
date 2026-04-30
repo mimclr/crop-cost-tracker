@@ -244,7 +244,7 @@ function CompraSheet({ open, onOpenChange, editing, onSaved }: SheetProps) {
   const isEdit = !!editing;
   const [data, setData] = useState(todayISO());
   const [insumo, setInsumo] = useState("");
-  const [unidade, setUnidade] = useState("kg");
+  const [unidade, setUnidade] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [precoUnit, setPrecoUnit] = useState("");
   const [fornecedor, setFornecedor] = useState("");
@@ -264,7 +264,7 @@ function CompraSheet({ open, onOpenChange, editing, onSaved }: SheetProps) {
     } else {
       setData(todayISO());
       setInsumo("");
-      setUnidade("kg");
+      setUnidade("");
       setQuantidade("");
       setPrecoUnit("");
       setFornecedor("");
