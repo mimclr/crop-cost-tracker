@@ -5,6 +5,7 @@ import {
   addLancamento,
   calcularRateios,
   updateLancamento,
+  type Compra,
   type Lancamento,
   type Talhao,
 } from "@/lib/db";
@@ -30,12 +31,15 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 
+const UNIDADES_SUGERIDAS = ["kg", "g", "L", "mL", "sc", "un", "t", "ha", "h", "diária"];
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: (l: Lancamento) => void;
   elementosUsados: string[];
   insumosComprados?: string[];
+  compras?: Compra[];
   talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
@@ -47,6 +51,7 @@ export function NovoLancamentoSheet({
   onSaved,
   elementosUsados,
   insumosComprados = [],
+  compras = [],
   talhoes,
   editing,
 }: Props) {
@@ -54,11 +59,37 @@ export function NovoLancamentoSheet({
   const [data, setData] = useState(todayISO());
   const [atividade, setAtividade] = useState<string>(ATIVIDADES[0]);
   const [elemento, setElemento] = useState("");
+  const [unidade, setUnidade] = useState("");
   const [quantidade, setQuantidade] = useState("");
+  const [valorUnit, setValorUnit] = useState(""); // novo: valor unitário (preenchido auto se for insumo)
   const [valorTotal, setValorTotal] = useState("");
   const [observacao, setObservacao] = useState("");
   const [talhaoIds, setTalhaoIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Mapa insumo (lowercase) -> última compra (preço médio simples = última)
+  const insumoInfo = useMemo(() => {
+    const map = new Map<string, { unidade: string; precoMedio: number }>();
+    const agg = new Map<string, { qtd: number; valor: number; unidade: string }>();
+    for (const c of compras) {
+      const k = c.insumo.trim().toLowerCase();
+      const cur = agg.get(k) ?? { qtd: 0, valor: 0, unidade: c.unidade };
+      cur.qtd += c.quantidade;
+      cur.valor += c.quantidade * c.preco_unitario;
+      if (!cur.unidade) cur.unidade = c.unidade;
+      agg.set(k, cur);
+    }
+    for (const [k, v] of agg) {
+      map.set(k, {
+        unidade: v.unidade,
+        precoMedio: v.qtd > 0 ? v.valor / v.qtd : 0,
+      });
+    }
+    return map;
+  }, [compras]);
+
+  const elementoKey = elemento.trim().toLowerCase();
+  const isInsumoComprado = insumoInfo.has(elementoKey);
 
   useEffect(() => {
     if (!open) return;
@@ -66,27 +97,54 @@ export function NovoLancamentoSheet({
       setData(editing.data);
       setAtividade(editing.atividade);
       setElemento(editing.elemento_despesa);
+      setUnidade((editing as Lancamento & { unidade?: string }).unidade ?? "");
       setQuantidade(String(editing.quantidade));
+      setValorUnit(String(editing.valor_unitario || ""));
       setValorTotal(String(editing.valor_total));
       setObservacao(editing.observacao);
-      // mantém apenas ids ainda existentes
       const validos = editing.talhao_ids.filter((id) => talhoes.some((t) => t.id === id));
       setTalhaoIds(validos.length ? validos : talhoes.map((t) => t.id));
     } else {
       setData(todayISO());
       setAtividade(ATIVIDADES[0]);
       setElemento("");
+      setUnidade("");
       setQuantidade("");
+      setValorUnit("");
       setValorTotal("");
       setObservacao("");
-      // padrão: todos os talhões
       setTalhaoIds(talhoes.map((t) => t.id));
     }
   }, [open, editing, talhoes]);
 
+  // Quando o usuário escolhe um insumo já comprado, autopreenche unidade e preço unit.
+  useEffect(() => {
+    const info = insumoInfo.get(elementoKey);
+    if (!info) return;
+    setUnidade((u) => (u ? u : info.unidade));
+    setValorUnit((v) => (v ? v : String(info.precoMedio.toFixed(2))));
+  }, [elementoKey, insumoInfo]);
+
   const qtd = parseFloat(quantidade.replace(",", "."));
-  const vt = parseFloat(valorTotal.replace(",", "."));
-  const vu = qtd > 0 && !isNaN(vt) ? vt / qtd : 0;
+  const vu = parseFloat(valorUnit.replace(",", "."));
+  const vtManual = parseFloat(valorTotal.replace(",", "."));
+
+  // Lógica do total:
+  // - Se insumo comprado: total = qtd * vu (calculado automaticamente)
+  // - Caso contrário: usuário informa valor total; vu derivado.
+  const totalCalculado = isInsumoComprado
+    ? qtd > 0 && vu >= 0
+      ? qtd * vu
+      : 0
+    : !isNaN(vtManual)
+      ? vtManual
+      : 0;
+
+  const valorUnitarioMostrado = isInsumoComprado
+    ? vu
+    : qtd > 0 && !isNaN(vtManual)
+      ? vtManual / qtd
+      : 0;
 
   const todosSelecionados = talhoes.length > 0 && talhaoIds.length === talhoes.length;
 
@@ -101,9 +159,9 @@ export function NovoLancamentoSheet({
   };
 
   const previewRateios = useMemo(() => {
-    if (!(qtd > 0) || isNaN(vt)) return [];
-    return calcularRateios(talhoes, talhaoIds, qtd, vt);
-  }, [talhoes, talhaoIds, qtd, vt]);
+    if (!(qtd > 0) || !(totalCalculado >= 0)) return [];
+    return calcularRateios(talhoes, talhaoIds, qtd, totalCalculado);
+  }, [talhoes, talhaoIds, qtd, totalCalculado]);
 
   const sugestoes = Array.from(
     new Set([...insumosComprados, ...ELEMENTOS_SUGERIDOS, ...elementosUsados]),
@@ -119,7 +177,12 @@ export function NovoLancamentoSheet({
       toast.error("Quantidade deve ser maior que zero");
       return;
     }
-    if (isNaN(vt) || vt < 0) {
+    const vtFinal = isInsumoComprado ? qtd * vu : vtManual;
+    if (isInsumoComprado && (isNaN(vu) || vu < 0)) {
+      toast.error("Valor unitário inválido");
+      return;
+    }
+    if (!isInsumoComprado && (isNaN(vtFinal) || vtFinal < 0)) {
       toast.error("Valor total inválido");
       return;
     }
@@ -134,7 +197,7 @@ export function NovoLancamentoSheet({
         atividade,
         elemento_despesa: elemento.trim(),
         quantidade: qtd,
-        valor_total: vt,
+        valor_total: vtFinal,
         observacao: observacao.trim(),
         talhao_ids: talhaoIds,
       };
@@ -201,8 +264,15 @@ export function NovoLancamentoSheet({
                 <option key={s} value={s} />
               ))}
             </datalist>
+            {isInsumoComprado && (
+              <p className="text-[11px] text-emerald-700">
+                Insumo da aba Compras — unidade e valor unitário preenchidos
+                automaticamente.
+              </p>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          <div className="grid grid-cols-[1fr_120px] gap-3">
             <div className="space-y-2">
               <Label htmlFor="qtd">Quantidade</Label>
               <Input
@@ -217,28 +287,73 @@ export function NovoLancamentoSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vt">Valor total (R$)</Label>
+              <Label htmlFor="un">Unidade</Label>
               <Input
-                id="vt"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                required
-                value={valorTotal}
-                onChange={(e) => setValorTotal(e.target.value)}
+                id="un"
+                list="unidades-lanc"
+                value={unidade}
+                onChange={(e) => setUnidade(e.target.value)}
+                placeholder="kg"
               />
+              <datalist id="unidades-lanc">
+                {UNIDADES_SUGERIDAS.map((u) => (
+                  <option key={u} value={u} />
+                ))}
+              </datalist>
             </div>
           </div>
-          <div
-            className="rounded-lg border p-3 text-sm flex justify-between items-center"
-            style={{ background: "var(--muted)" }}
-          >
-            <span className="text-muted-foreground">Valor unitário</span>
-            <span className="font-semibold">
-              {vu > 0 ? brl(vu) : "—"}
-            </span>
-          </div>
+
+          {isInsumoComprado ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="vu">Valor unitário (R$ por {unidade || "un"})</Label>
+                <Input
+                  id="vu"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={valorUnit}
+                  onChange={(e) => setValorUnit(e.target.value)}
+                />
+              </div>
+              <div
+                className="rounded-lg border p-3 text-sm flex justify-between items-center"
+                style={{ background: "var(--muted)" }}
+              >
+                <span className="text-muted-foreground">Valor total (qtd × unit.)</span>
+                <span className="font-semibold">
+                  {totalCalculado > 0 ? brl(totalCalculado) : "—"}
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="vt">Valor total (R$)</Label>
+                <Input
+                  id="vt"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={valorTotal}
+                  onChange={(e) => setValorTotal(e.target.value)}
+                />
+              </div>
+              <div
+                className="rounded-lg border p-3 text-sm flex justify-between items-center"
+                style={{ background: "var(--muted)" }}
+              >
+                <span className="text-muted-foreground">Valor unitário</span>
+                <span className="font-semibold">
+                  {valorUnitarioMostrado > 0 ? brl(valorUnitarioMostrado) : "—"}
+                </span>
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <div className="flex justify-between items-center">
