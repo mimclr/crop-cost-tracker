@@ -62,12 +62,19 @@ export function Compras({ onChange }: Props) {
     reload().finally(() => setLoading(false));
   }, []);
 
+  const insumosUnicos = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of compras) {
+      const v = c.insumo?.trim();
+      if (v) set.add(v);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [compras]);
+
   const filtradas = useMemo(() => {
-    const t = busca.trim().toLowerCase();
-    if (!t) return compras;
-    return compras.filter((c) =>
-      `${c.insumo} ${c.fornecedor} ${c.observacao} ${c.unidade}`.toLowerCase().includes(t),
-    );
+    if (!busca) return compras;
+    const t = busca.toLowerCase();
+    return compras.filter((c) => c.insumo.trim().toLowerCase() === t);
   }, [compras, busca]);
 
   const totalGasto = filtradas.reduce((s, c) => s + c.quantidade * c.preco_unitario, 0);
