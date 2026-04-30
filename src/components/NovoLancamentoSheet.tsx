@@ -40,6 +40,7 @@ interface Props {
   elementosUsados: string[];
   insumosComprados?: string[];
   compras?: Compra[];
+  lancamentos?: Lancamento[];
   talhoes: Talhao[];
   /** Quando definido, abre em modo edição */
   editing?: Lancamento | null;
